@@ -111,8 +111,11 @@ tr:hover td{background:color-mix(in srgb,var(--accent-soft) 45%,transparent)}
 .ms summary::-webkit-details-marker{display:none}
 .ms summary::after{content:"▾";position:absolute;right:10px;color:var(--muted)}
 .msp{position:absolute;z-index:6;top:calc(100% + 4px);left:0;width:min(420px,calc(100vw - 32px));max-height:360px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px;box-shadow:0 8px 24px color-mix(in srgb,var(--ink) 14%,transparent)}
-.msi{display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer;font-size:13px}
-.msi span:nth-child(2){flex:1;min-width:0}
+.msi{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:5px 2px;cursor:pointer;font-size:13px}
+.msi input[type=checkbox]{flex:none;width:18px;height:18px;min-height:0;margin:0;accent-color:var(--accent)}
+.msi span:nth-child(2){min-width:0}
+.msh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;position:sticky;top:-10px;background:var(--surface);padding:4px 0;z-index:1}
+.msb{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:7px 12px;cursor:pointer;font-weight:700}
 .btn.p{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .done td{background:color-mix(in srgb,var(--accent-soft) 60%,transparent)}
@@ -195,8 +198,15 @@ nav.tabs .ic,nav.tabs .cel,.mfil{display:none}
   .filters>.btn.p{flex-basis:100%}
   .filters select,.filters input,.ms summary{padding:10px 12px;border-radius:12px;background:var(--surface)}
   .msp{position:fixed;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));top:auto;bottom:calc(76px + env(safe-area-inset-bottom,0px));width:auto;max-height:60vh;z-index:9}
-  .msi{font-size:15px;padding:9px 2px;flex-wrap:wrap}
-  .msi input{width:22px;height:22px;min-height:0}
+  .msp{box-shadow:0 0 0 100vmax color-mix(in srgb,#000 40%,transparent);padding:0 12px 12px;top:calc(12px + env(safe-area-inset-top,0px));max-height:none}
+  .msh{top:0;padding:12px 0 8px;margin:0;border-bottom:1px solid var(--line)}
+  .msh b{font-size:17px}
+  .msh .btn{min-height:42px;padding:8px 18px}
+  .msb{margin:10px 0 4px}
+  .msb .btn{flex:1 1 auto;min-height:42px;padding:8px 10px;font-size:15px}
+  .msi{grid-template-columns:26px 1fr;font-size:16px;padding:10px 2px;border-bottom:1px solid var(--line);row-gap:4px}
+  .msi input[type=checkbox]{width:24px;height:24px;grid-row:span 2}
+  .msi .chip{grid-column:2;justify-self:start}
   .brow{grid-template-columns:minmax(0,1fr) 38% 56px;font-size:14px;gap:8px}
   .brow .t{height:16px}
   .legend{font-size:13px}
@@ -447,6 +457,7 @@ function colecoes(){const tot=DATA.col.reduce((a,c)=>a+(REG==='U'?c.est:c.reg[RE
 function subgrupos(){const tot=DATA.sub.reduce((a,c)=>a+(REG==='U'?c.est:c.reg[REG]),0);return DATA.sub.map(s=>({...s,v:REG==='U'?s.est:s.reg[REG]})).sort((a,b)=>b.v-a.v).map(s=>({...s,p:100*s.v/tot}))}
 
 /* ---------- Remanejamentos ---------- */
+function fechaOrigem(e){const d=document.getElementById('fDe');if(d&&d.open&&!d.contains(e.target)){d.open=false;RF.abre=false}}
 const RF={tipo:'',escopo:'',des:new Set(),para:'',q:'',st:'todos',abre:false,resumo:false,resumoTodas:true,sub:'',grupo:''};
 // unidade do item: calçado em pares, bolsa e acessório em peças
 const un=s=>s.par===false?'pç':'pr', unL=s=>s.par===false?'peças':'pares';
@@ -469,7 +480,7 @@ function vReman(){
     <select id="fTipo" aria-label="Tipo"><option value="">Todos os tipos</option><option value="grade" ${RF.tipo==='grade'?'selected':''}>Recompor grade</option><option value="parado" ${RF.tipo==='parado'?'selected':''}>Tirar parado</option></select>
     <select id="fEsc" aria-label="Escopo"><option value="">Dentro e entre regionais</option><option value="intra" ${RF.escopo==='intra'?'selected':''}>Só dentro da regional</option><option value="inter" ${RF.escopo==='inter'?'selected':''}>Só entre regionais</option></select>
     <details class="ms" id="fDe" ${RF.abre?'open':''}><summary>Origem: ${RF.des.size?RF.des.size+' loja'+(RF.des.size>1?'s':''):'todas'}</summary>
-     <div class="msp"><div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn" id="deTodas" type="button">Marcar todas</button><button class="btn" id="deLimpa" type="button">Limpar</button><button class="btn" id="deExc" type="button">Só com excesso</button></div>
+     <div class="msp"><div class="msh"><b>Lojas de origem</b><button class="btn p" id="deOk" type="button">Concluir</button></div><div class="msb"><button class="btn" id="deTodas" type="button">Marcar todas</button><button class="btn" id="deLimpa" type="button">Limpar</button><button class="btn" id="deExc" type="button">Só com excesso</button></div>
      ${origens().map(l=>{const s=saude(l);return `<label class="msi"><input type="checkbox" id="de-${l.cod}" value="${l.cod}" ${RF.des.has(l.cod)?'checked':''}> <span>${l.num} ${esc(l.nome)}</span> <span class="chip ${s.c}">${rotSaude(l)}</span></label>`}).join('')}</div></details>
     <select id="fPara" aria-label="Destino"><option value="">Destino: todas</option>${origens().map(l=>`<option value="${l.cod}" ${RF.para===l.cod?'selected':''}>${l.num} ${esc(l.nome)} · ${rotSaude(l)}</option>`).join('')}</select>
     <select id="fGrupo" aria-label="Grupo"><option value="">Grupo: todos</option>${(()=>{const c={};for(const s of S)c[s.grupo||'CALCADOS']=(c[s.grupo||'CALCADOS']||0)+s.qtd;return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,q])=>`<option value="${esc(k)}" ${RF.grupo===k?'selected':''}>${esc(GRUPO_N[k]||k)} · ${q} ${k==='CALCADOS'?'pr':'pç'}</option>`).join('')})()}</select>
@@ -499,6 +510,9 @@ function vReman(){
   bind('#fTipo','tipo');bind('#fEsc','escopo');bind('#fPara','para');bind('#fSub','sub');
   $('#fGrupo').addEventListener('change',e=>{RF.grupo=e.target.value;RF.sub='';vReman()});
   $('#fDe').addEventListener('toggle',e=>{RF.abre=e.target.open});
+  $('#deOk').addEventListener('click',()=>{RF.abre=false;$('#fDe').open=false});
+  // tocar fora da lista fecha (no celular ela cobre a tela)
+  document.removeEventListener('pointerdown',fechaOrigem); document.addEventListener('pointerdown',fechaOrigem);
   document.querySelectorAll('#fDe input[type=checkbox]').forEach(c=>c.addEventListener('change',()=>{c.checked?RF.des.add(c.value):RF.des.delete(c.value);RF.abre=true;vReman()}));
   $('#deTodas').onclick=()=>{origens().forEach(l=>RF.des.add(l.cod));RF.abre=true;vReman()};
   $('#deLimpa').onclick=()=>{RF.des.clear();RF.abre=true;vReman()};
@@ -799,7 +813,7 @@ aplicaId(ls('cg-id2')||'passo'); render();
 #entrada .msg{min-height:22px;font-size:15px;color:#c0352b}
 #entrada .ok{color:#1d6b4f}
 #entrada .ios{font-size:14px;background:#fff;border:1px solid #dbe5df;border-radius:12px;padding:12px;color:#16241d}
-#sairApp{position:fixed;z-index:40;right:max(10px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));font:600 13px system-ui,sans-serif;background:#fff;color:#5d6e64;border:1px solid #dbe5df;border-radius:999px;padding:8px 12px}
+#sairApp{position:absolute;z-index:6;right:max(12px,env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));font:600 13px system-ui,sans-serif;background:#fff;color:#5d6e64;border:1px solid #dbe5df;border-radius:999px;padding:8px 12px}
 </style>
 <div id="entrada"><div class="cx">
   <svg class="lg" viewBox="0 0 48 48" aria-hidden="true"><rect width="48" height="48" rx="14" fill="#1d6b4f"/><ellipse cx="18" cy="28" rx="5" ry="9" fill="#fff"/><ellipse cx="31" cy="19" rx="5" ry="9" fill="#fff" opacity=".7"/><circle cx="18" cy="15" r="2" fill="#fff"/></svg>
