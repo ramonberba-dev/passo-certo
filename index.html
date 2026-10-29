@@ -249,7 +249,7 @@ nav.tabs .ic,nav.tabs .cel,.mfil{display:none}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="text/plain" id="appjs">
 // PDF de remanejamento por loja, no visual Passo Certo (jsPDF). Usado pelo app (e-mail e "Baixar PDF").
-// dados = { loja, data, envia:[{grupo, pares, itens:[{ref, desc, cores:[{n,t}], qtd, foto}]}], recebe:[...] }
+// dados = { loja, data, envia:[{grupo, pares, itens:[{ref, desc, cores:[{n,t}], qtd, foto, par}]}], recebe:[...] }
 // foto = jpeg em base64 (miniatura 240px) ou vazio. Retorna o PDF em base64.
 function pdfLoja(jsPDF, dados) {
   const d = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
@@ -274,7 +274,7 @@ function pdfLoja(jsPDF, dados) {
   cabecalho();
   // resumo
   d.setFillColor(...fundo); d.roundedRect(M, y, W - 2 * M, 18, 3, 3, 'F');
-  const kp = [['Envia', total(dados.envia) + ' pares'], ['Recebe', total(dados.recebe) + ' pares'], ['Lojas envolvidas', String(new Set([...dados.envia, ...dados.recebe].map(g => g.grupo)).size)]];
+  const kp = [['Envia', total(dados.envia) + ' ' + (dados.envia.concat(dados.recebe).some(g => g.itens.some(i => i.par === false)) ? 'peças' : 'pares')], ['Recebe', total(dados.recebe) + ' ' + (dados.envia.concat(dados.recebe).some(g => g.itens.some(i => i.par === false)) ? 'peças' : 'pares')], ['Lojas envolvidas', String(new Set([...dados.envia, ...dados.recebe].map(g => g.grupo)).size)]];
   kp.forEach(([r, v], i) => { const x = M + 6 + i * 60; d.setTextColor(...mudo); d.setFont('helvetica', 'normal'); d.setFontSize(8); d.text(r.toUpperCase(), x, y + 7); d.setTextColor(...tinta); d.setFont('helvetica', 'bold'); d.setFontSize(13); d.text(v, x, y + 14); });
   y += 26;
   const secao = (titulo, grupos, rot) => {
@@ -283,7 +283,7 @@ function pdfLoja(jsPDF, dados) {
     for (const g of grupos) {
       cabe(34); d.setFillColor(...suave); d.roundedRect(M, y - 4.5, W - 2 * M, 8, 2, 2, 'F');
       d.setTextColor(...verde); d.setFont('helvetica', 'bold'); d.setFontSize(10); d.text(`${rot} ${g.grupo}`, M + 3, y + 1);
-      d.text(`${g.pares} pares`, W - M - 3, y + 1, { align: 'right' }); y += 8;
+      d.text(`${g.pares} ${g.itens.some(i => i.par === false) ? 'peças' : 'pares'}`, W - M - 3, y + 1, { align: 'right' }); y += 8;
       for (const it of g.itens) {
         const desc = d.splitTextToSize(it.desc, 112), cores = it.cores.map(c => `${c.n}:  ${c.t.replace(/:/g, '×').replace(/ /g, '   ')}`);
         const h = Math.max(24, 9 + desc.length * 4.2 + cores.length * 4.6);
@@ -295,7 +295,7 @@ function pdfLoja(jsPDF, dados) {
         d.setTextColor(...tinta); d.setFont('helvetica', 'bold'); d.setFontSize(10); d.text(desc, x, yy); yy += desc.length * 4.2 + 0.8;
         d.setFont('helvetica', 'normal'); d.setFontSize(9.5); for (const c of cores) { d.text(c, x, yy); yy += 4.6; }
         d.setTextColor(...verde); d.setFont('helvetica', 'bold'); d.setFontSize(16); d.text(String(it.qtd), W - M - 3, y + 11, { align: 'right' });
-        d.setTextColor(...mudo); d.setFont('helvetica', 'normal'); d.setFontSize(7.5); d.text('pares', W - M - 3, y + 15, { align: 'right' });
+        d.setTextColor(...mudo); d.setFont('helvetica', 'normal'); d.setFontSize(7.5); d.text(it.par === false ? 'peças' : 'pares', W - M - 3, y + 15, { align: 'right' });
         y += h; d.setDrawColor(...linha); d.setLineWidth(0.2); d.line(M, y - 2, W - M, y - 2);
       }
       y += 4;
@@ -447,14 +447,17 @@ function colecoes(){const tot=DATA.col.reduce((a,c)=>a+(REG==='U'?c.est:c.reg[RE
 function subgrupos(){const tot=DATA.sub.reduce((a,c)=>a+(REG==='U'?c.est:c.reg[REG]),0);return DATA.sub.map(s=>({...s,v:REG==='U'?s.est:s.reg[REG]})).sort((a,b)=>b.v-a.v).map(s=>({...s,p:100*s.v/tot}))}
 
 /* ---------- Remanejamentos ---------- */
-const RF={tipo:'',escopo:'',des:new Set(),para:'',q:'',st:'todos',abre:false,resumo:false,resumoTodas:true,sub:''};
+const RF={tipo:'',escopo:'',des:new Set(),para:'',q:'',st:'todos',abre:false,resumo:false,resumoTodas:true,sub:'',grupo:''};
+// unidade do item: calçado em pares, bolsa e acessório em peças
+const un=s=>s.par===false?'pç':'pr', unL=s=>s.par===false?'peças':'pares';
+const GRUPO_N={CALCADOS:'Calçados',BOLSAS:'Bolsas',ACESSORIOS:'Acessórios'};
 // saúde do estoque da loja pela cobertura de calçados (semanas)
 const saude = l=>l.wosPar==null?{t:'sem venda',c:'in',ok:false}:l.wosPar>40?{t:'excesso',c:'ba',ok:false}:l.wosPar>26?{t:'alto',c:'wa',ok:false}:l.wosPar<10?{t:'enxuto',c:'in',ok:false}:{t:'saudável',c:'ok',ok:true};
 const rotSaude = l=>{const s=saude(l);return `${s.ok?'':'⚠ '}${s.t}${l.wosPar!=null?' · '+f1(l.wosPar)+' sem':''}`};
 function vReman(){
   const S=sugR(); const L=lojasR();
   const opts = (arr,sel)=>'<option value="">Todas</option>'+arr.map(l=>`<option value="${l.cod}" ${sel===l.cod?'selected':''}>${l.num} ${esc(l.nome)}</option>`).join('');
-  const lista = S.filter(s=>(!RF.tipo||s.tipo===RF.tipo)&&(!RF.escopo||(RF.escopo==='intra'?s.intra:!s.intra))&&(!RF.des.size||RF.des.has(s.de))&&(!RF.para||s.para===RF.para)&&(!RF.sub||(s.sub||'—')===RF.sub)
+  const lista = S.filter(s=>(!RF.tipo||s.tipo===RF.tipo)&&(!RF.escopo||(RF.escopo==='intra'?s.intra:!s.intra))&&(!RF.des.size||RF.des.has(s.de))&&(!RF.para||s.para===RF.para)&&(!RF.sub||(s.sub||'—')===RF.sub)&&(!RF.grupo||(s.grupo||'CALCADOS')===RF.grupo)
     &&(!RF.q||(s.desc+' '+s.ref+' '+s.sub).toLowerCase().includes(RF.q.toLowerCase()))&&(RF.st==='todos'||(RF.st==='feitos'?feito.has(key(s)):!feito.has(key(s)))));
   const todas = DATA.lojas;
   $('#v-reman').innerHTML=`
@@ -469,7 +472,8 @@ function vReman(){
      <div class="msp"><div style="display:flex;gap:6px;margin-bottom:6px"><button class="btn" id="deTodas" type="button">Marcar todas</button><button class="btn" id="deLimpa" type="button">Limpar</button><button class="btn" id="deExc" type="button">Só com excesso</button></div>
      ${origens().map(l=>{const s=saude(l);return `<label class="msi"><input type="checkbox" id="de-${l.cod}" value="${l.cod}" ${RF.des.has(l.cod)?'checked':''}> <span>${l.num} ${esc(l.nome)}</span> <span class="chip ${s.c}">${rotSaude(l)}</span></label>`}).join('')}</div></details>
     <select id="fPara" aria-label="Destino"><option value="">Destino: todas</option>${origens().map(l=>`<option value="${l.cod}" ${RF.para===l.cod?'selected':''}>${l.num} ${esc(l.nome)} · ${rotSaude(l)}</option>`).join('')}</select>
-    <select id="fSub" aria-label="Categoria"><option value="">Categoria: todas</option>${(()=>{const c={};for(const s of S)c[s.sub||'—']=(c[s.sub||'—']||0)+s.qtd;return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,q])=>`<option value="${esc(k)}" ${RF.sub===k?'selected':''}>${esc(k)} · ${q} pr</option>`).join('')})()}</select>
+    <select id="fGrupo" aria-label="Grupo"><option value="">Grupo: todos</option>${(()=>{const c={};for(const s of S)c[s.grupo||'CALCADOS']=(c[s.grupo||'CALCADOS']||0)+s.qtd;return Object.entries(c).sort((a,b)=>b[1]-a[1]).map(([k,q])=>`<option value="${esc(k)}" ${RF.grupo===k?'selected':''}>${esc(GRUPO_N[k]||k)} · ${q} ${k==='CALCADOS'?'pr':'pç'}</option>`).join('')})()}</select>
+    <select id="fSub" aria-label="Categoria"><option value="">Categoria: todas</option>${(()=>{const c={};for(const s of S)if(!RF.grupo||(s.grupo||'CALCADOS')===RF.grupo){const k=s.sub||'—';(c[k]??={q:0,s})['q']+=s.qtd}return Object.entries(c).sort((a,b)=>b[1].q-a[1].q).map(([k,v])=>`<option value="${esc(k)}" ${RF.sub===k?'selected':''}>${esc(k)} · ${v.q} ${un(v.s)}</option>`).join('')})()}</select>
     <select id="fSt" aria-label="Situação"><option value="todos" ${RF.st==='todos'?'selected':''}>Todas</option><option value="feitos" ${RF.st==='feitos'?'selected':''}>Selecionadas</option><option value="abertos" ${RF.st==='abertos'?'selected':''}>Não selecionadas</option></select>
     <input id="fQ" type="search" placeholder="Buscar produto, referência ou subgrupo" value="${esc(RF.q)}">
     <button class="btn" id="bTodas">Selecionar as visíveis</button>
@@ -485,14 +489,15 @@ function vReman(){
      <td class="prod">${comFoto(s.ref,`<b>${esc(s.desc)}</b><small>${s.ref} · ${esc(s.sub||'')} · ${esc(s.col||'')}</small>`)}</td>
      <td><div class="route">${nomeL(s.de)}<i>→</i>${nomeL(s.para)}</div>${regTag(s.de)} ${s.intra?'':'<span class="chip ac">entre regionais</span> '}${regTag(s.para)}</td>
      <td class="grade">${s.cores.map(c=>`<div><small>${esc(c.n)}</small><br>${tamsHtml(c.t)}</div>`).join('')}</td>
-     <td class="n"><b>${s.qtd}</b></td>
+     <td class="n"><b>${s.qtd}</b> ${un(s)}</td>
      <td class="why">${porque(s)}</td>
-     <td class="n">${ganho(s)} pr</td></tr>`).join('')}
+     <td class="n">${ganho(s)} ${un(s)}</td></tr>`).join('')}
    </tbody></table></div>
    ${lista.length>400?`<p class="note">Mostrando as 400 de maior prioridade. Use os filtros para ver as outras.</p>`:''}
   </div>`;
   const bind=(id,k,ev='change')=>$(id).addEventListener(ev,e=>{RF[k]=e.target.value;vReman(); if(ev==='input'){const el=$('#fQ');el.focus();el.setSelectionRange(el.value.length,el.value.length)}});
   bind('#fTipo','tipo');bind('#fEsc','escopo');bind('#fPara','para');bind('#fSub','sub');
+  $('#fGrupo').addEventListener('change',e=>{RF.grupo=e.target.value;RF.sub='';vReman()});
   $('#fDe').addEventListener('toggle',e=>{RF.abre=e.target.open});
   document.querySelectorAll('#fDe input[type=checkbox]').forEach(c=>c.addEventListener('change',()=>{c.checked?RF.des.add(c.value):RF.des.delete(c.value);RF.abre=true;vReman()}));
   $('#deTodas').onclick=()=>{origens().forEach(l=>RF.des.add(l.cod));RF.abre=true;vReman()};
@@ -582,7 +587,7 @@ function dadosPdf(cod,S){
   // o envio pelo conector aceita ~1 MB: fotos entram até ~650 mil caracteres (cada foto conta uma vez)
   let orc=650000; const usadas=new Set();
   const ft=ref=>{const f=FOTOS[ref];if(!f)return '';if(usadas.has(ref))return f;if(f.length>orc)return '';orc-=f.length;usadas.add(ref);return f};
-  const grupo=(arr,campo)=>{const g={};for(const s of arr)(g[s[campo]]??=[]).push(s);return Object.entries(g).map(([c,a])=>({grupo:nCurto(c),pares:a.reduce((x,s)=>x+s.qtd,0),itens:a.map(s=>({ref:s.ref,desc:s.desc,cores:s.cores,qtd:s.qtd,foto:ft(s.ref)}))}))};
+  const grupo=(arr,campo)=>{const g={};for(const s of arr)(g[s[campo]]??=[]).push(s);return Object.entries(g).map(([c,a])=>({grupo:nCurto(c),pares:a.reduce((x,s)=>x+s.qtd,0),itens:a.map(s=>({ref:s.ref,desc:s.desc,cores:s.cores,qtd:s.qtd,foto:ft(s.ref),par:s.par}))}))};
   return {loja:nCurto(cod),data:new Date().toLocaleDateString('pt-BR'),envia:grupo(S.filter(s=>s.de===cod),'para'),recebe:grupo(S.filter(s=>s.para===cod),'de')};
 }
 const nomePdf=cod=>`Remanejamento ${LJ[cod].num} ${LJ[cod].nome} ${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.pdf`;
@@ -618,7 +623,7 @@ const REGRAS=['O remanejamento deve ser feito imediatamente, assim que este e-ma
   'Cada caixa leva um espelho visível na parte de fora, com: loja de origem, loja de destino e número do romaneio.',
   'Confiram a numeração na separação. Se algum par não estiver na loja, avisem antes de despachar.',
   'Se houver inventário próximo, avisem a supervisão antes de separar a mercadoria.'];
-const linhaItem = s=>`${s.ref} ${s.desc}: ${s.cores.map(c=>c.n+' '+c.t.replace(/:/g,'×')).join(' | ')} (${s.qtd} pares)`;
+const linhaItem = s=>`${s.ref} ${s.desc}: ${s.cores.map(c=>c.n+' '+c.t.replace(/:/g,'×')).join(' | ')} (${s.qtd} ${unL(s)})`;
 function textoEmail(cod, S){
   const env=S.filter(s=>s.de===cod), rec=S.filter(s=>s.para===cod), L=LJ[cod], hoje=new Date().toLocaleDateString('pt-BR');
   const grupo=(arr,campo,rot)=>{const g={};for(const s of arr)(g[s[campo]]??=[]).push(s);return Object.entries(g).map(([c,a])=>`${rot} ${nomeL(c)} (${a.reduce((x,s)=>x+s.qtd,0)} pares):\n`+a.map(s=>'  • '+linhaItem(s)).join('\n')).join('\n\n')};
